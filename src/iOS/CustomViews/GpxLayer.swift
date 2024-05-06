@@ -11,7 +11,7 @@ import UIKit
 
 final class GpxLayer: LineDrawingLayer, GetDiskCacheSize {
 	private static let DefaultExpirationDays = 7
-
+	private var widgetManager: WidgetManagerProtocol?
 	var stabilizingCount = 0
 
 	private(set) var activeTrack: GpxTrack? // track currently being recorded
@@ -25,15 +25,6 @@ final class GpxLayer: LineDrawingLayer, GetDiskCacheSize {
 	}
 
 	private(set) var previousTracks: [GpxTrack] = [] // sorted with most recent first
-
-	/*
-	 override init(layer: Any) {
-	 	let layer = layer as! GpxLayer
-	 	mapView = layer.mapView
-	 	uploadedTracks = [:]
-	 	super.init(layer: layer)
-	 }
-	  */
 
 	override init(mapView: MapView) {
 		let uploads = UserPrefs.shared.object(forKey: .gpxUploadedGpxTracks) as? [String: NSNumber] ?? [:]
@@ -55,6 +46,12 @@ final class GpxLayer: LineDrawingLayer, GetDiskCacheSize {
 		activeTrack = GpxTrack()
 		stabilizingCount = 0
 		selectedTrack = activeTrack
+		if widgetManager == nil {
+			if #available(iOS 16.2, *) {
+				widgetManager = GpxTrackWidgetManager()
+			}
+		}
+		widgetManager?.start(start: activeTrack!.creationDate)
 	}
 
 	func endActiveTrack() {
@@ -72,6 +69,9 @@ final class GpxLayer: LineDrawingLayer, GetDiskCacheSize {
 			save(toDisk: activeTrack)
 			self.activeTrack = nil
 			selectedTrack = nil
+
+			widgetManager?.stop(end: Date(),
+			                    pointCount: activeTrack.points.count)
 		}
 	}
 
@@ -174,6 +174,8 @@ final class GpxLayer: LineDrawingLayer, GetDiskCacheSize {
 			}
 
 			setNeedsLayout()
+
+			widgetManager?.update(points: activeTrack.points.count)
 		}
 	}
 
